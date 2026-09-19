@@ -119,6 +119,11 @@ let bossDamageSound = null;
 let bgMusicSounds = [];
 let currentBgMusic = null;
 let bgMusicLoading = false;
+let openingSong = null;
+let currentOpeningMusic = null;
+let gameoverSound = null;
+let congratsSound = null;
+let specialSound = null;
 
 function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -144,6 +149,34 @@ function initAudio(){
       .then(r=>r.arrayBuffer())
       .then(buf=>audioCtx.decodeAudioData(buf))
       .then(decoded=>{bossDamageSound=decoded;})
+      .catch(()=>{});
+  }
+  if(!openingSong){
+    fetch("sounds/opening.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{openingSong=decoded;})
+      .catch(()=>{});
+  }
+  if(!gameoverSound){
+    fetch("sounds/gameover.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{gameoverSound=decoded;})
+      .catch(()=>{});
+  }
+  if(!congratsSound){
+    fetch("sounds/congrats.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{congratsSound=decoded;})
+      .catch(()=>{});
+  }
+  if(!specialSound){
+    fetch("sounds/special.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{specialSound=decoded;})
       .catch(()=>{});
   }
   if(bgMusicSounds.length === 0 && !bgMusicLoading){
@@ -231,6 +264,57 @@ function playBossDamageSound(){
   src.start();
 }
 
+function playSpecialSound(){
+  if(!soundOn || !specialSound) return;
+  initAudio();
+  const src = audioCtx.createBufferSource();
+  src.buffer = specialSound;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.7;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playOneShot(buf, gainMul){
+  if(!buf) return;
+  initAudio();
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * gainMul;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playGameoverSound(){ playOneShot(gameoverSound, 0.8); }
+function playCongratsSound(){ playOneShot(congratsSound, 0.9); }
+
+function startOpeningMusic(){
+  if(!musicOn) return;
+  initAudio();
+  stopOpeningMusic();
+  if(!openingSong){
+    setTimeout(startOpeningMusic, 100);
+    return;
+  }
+  currentOpeningMusic = audioCtx.createBufferSource();
+  currentOpeningMusic.buffer = openingSong;
+  currentOpeningMusic.loop = true;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.4;
+  currentOpeningMusic.connect(gain);
+  gain.connect(audioCtx.destination);
+  currentOpeningMusic.start();
+}
+function stopOpeningMusic(){
+  if(currentOpeningMusic){
+    currentOpeningMusic.stop();
+    currentOpeningMusic = null;
+  }
+}
+
 function resetPlayer() {
   player = {x:120, y:H/2, r:22, hp:100, maxHp:100, speed:1.65, special:100};
   shots = [];
@@ -272,6 +356,7 @@ function startGame() {
   score = 0;
   selected = 0;
   document.querySelectorAll(".power").forEach((b,i)=>b.classList.toggle("sel", i===0));
+  stopOpeningMusic();
   loadPhase();
   startMusic();
 }
@@ -345,6 +430,7 @@ function useSkill() {
     bossFrozen = 90;
   }
   burst(player.x,player.y,squad[selected].emoji);
+  playSpecialSound();
 }
 
 function hurt(damage) {
@@ -357,6 +443,7 @@ function hurt(damage) {
     running = false;
     stopMusic();
     playDeathSound();
+    playGameoverSound();
     deathAnimation = {t:0};
     document.getElementById("status").textContent =
       `💀 DERROTA NA FASE ${phase+1}. Aperte JOGAR para tentar novamente.`;
@@ -373,6 +460,7 @@ function defeatBoss() {
     running = false;
     stopMusic();
     playVictorySound();
+    playCongratsSound();
     victoryAnimation = {t:0};
     document.getElementById("status").textContent =
       `🏆 VOCÊS VENCERAM AS 10 FASES! BUG SUPREMO DERROTADO! PONTOS: ${score}`;
@@ -566,6 +654,7 @@ function draw() {
     ctx.font="bold 54px system-ui";
     ctx.fillText("💥",W/2,H/2-45-p*25);
     ctx.font="bold 38px system-ui";
+    ctx.fillStyle="#fff";
     ctx.fillText("💀 VOCÊ FOI DERROTADO!",W/2,H/2+35);
     ctx.font="20px system-ui";
     ctx.fillText(`Fase ${phase+1}/10`,W/2,H/2+72);
@@ -663,6 +752,8 @@ document.getElementById("speedMode").onchange=e=>{
 };
 */
 draw();
+initAudio();
+startOpeningMusic();
 requestAnimationFrame(loop);
 </script>
 </body>
