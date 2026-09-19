@@ -17,6 +17,7 @@
   button:active{transform:translateY(2px);box-shadow:0 2px 0 #321580}
   .green{background:#1b9b61;box-shadow:0 4px 0 #0c5b39}
   .red{background:#c7374b;box-shadow:0 4px 0 #751b29}
+  #mute.muted{background:#3a314a;box-shadow:0 4px 0 #251b3a}
   #info{background:#151025;border:1px solid #33265c;border-radius:12px;padding:10px;text-align:center}
   .hide{display:none!important}
   #touch{display:grid;grid-template-columns:repeat(3,60px);gap:6px;justify-content:center;margin-top:10px}
@@ -42,6 +43,7 @@
     <button id="play">▶️ JOGAR</button>
     <button id="restart" class="red">↻ RECOMEÇAR</button>
     <button id="pause" class="green">⏸ PAUSAR</button>
+    <button id="mute">🔊 MÚSICA</button>
   </div>
   <div id="info">
     <b id="status">Clique em JOGAR para começar.</b><br>
@@ -124,6 +126,7 @@ let currentOpeningMusic = null;
 let gameoverSound = null;
 let congratsSound = null;
 let specialSound = null;
+let bgImages = [];
 
 function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -189,6 +192,14 @@ function initAudio(){
         .catch(()=>{});
     }
   }
+}
+function loadBgImages(){
+  bgImages = [];
+  phases.forEach((_,i)=>{
+    const img = new Image();
+    img.src = `images/bg${i+1}.jpg`;
+    bgImages[i] = img;
+  });
 }
 function tone(freq,duration=0.10,type="square",gain=0.035){
   if(!soundOn) return;
@@ -312,6 +323,18 @@ function stopOpeningMusic(){
   if(currentOpeningMusic){
     currentOpeningMusic.stop();
     currentOpeningMusic = null;
+  }
+}
+function toggleMusic(){
+  musicOn = !musicOn;
+  const btn = document.getElementById("mute");
+  btn.classList.toggle("muted", !musicOn);
+  btn.textContent = musicOn ? "🔊 MÚSICA" : "🔇 MÚSICA";
+  if(musicOn){
+    if(running && player) startMusic(); else startOpeningMusic();
+  } else {
+    stopMusic();
+    stopOpeningMusic();
   }
 }
 
@@ -570,8 +593,13 @@ function drawBar(x,y,w,h,value,max,fill) {
 function draw() {
   ctx.clearRect(0,0,W,H);
   const hue = (phase*32)%360;
-  ctx.fillStyle = `hsl(${hue},40%,9%)`;
-  ctx.fillRect(0,0,W,H);
+  const bgImg = (player && boss) && bgImages[phase] && bgImages[phase].complete;
+  if(bgImg){
+    ctx.drawImage(bgImages[phase], 0, 0, W, H);
+  } else {
+    ctx.fillStyle = `hsl(${hue},40%,9%)`;
+    ctx.fillRect(0,0,W,H);
+  }
 
   for(let i=0;i<60;i++){
     ctx.fillStyle="rgba(255,255,255,.09)";
@@ -710,6 +738,9 @@ document.addEventListener("keyup", e => keys[e.code]=false);
 document.getElementById("play").onclick = startGame;
 document.getElementById("restart").onclick = startGame;
 document.getElementById("pause").onclick = togglePause;
+document.getElementById("mute").onclick = toggleMusic;
+document.getElementById("mute").classList.toggle("muted", !musicOn);
+document.getElementById("mute").textContent = musicOn ? "🔊 MÚSICA" : "🔇 MÚSICA";
 
 const powersEl = document.getElementById("powers");
 powersEl.innerHTML="";
@@ -753,6 +784,7 @@ document.getElementById("speedMode").onchange=e=>{
 */
 draw();
 initAudio();
+loadBgImages();
 startOpeningMusic();
 requestAnimationFrame(loop);
 </script>
