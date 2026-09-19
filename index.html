@@ -117,6 +117,7 @@ let laserSound = null;
 let damageSounds = [];
 let bgMusicSounds = [];
 let currentBgMusic = null;
+let bgMusicLoading = false;
 
 function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -137,7 +138,8 @@ function initAudio(){
         .catch(()=>{});
     }
   }
-  if(bgMusicSounds.length === 0){
+  if(bgMusicSounds.length === 0 && !bgMusicLoading){
+    bgMusicLoading = true;
     for(let i=1;i<=10;i++){
       fetch(`sounds/bg/p${i}.wav`)
         .then(r=>r.arrayBuffer())
@@ -161,7 +163,11 @@ function startMusic(){
   initAudio();
   stopMusic();
   const buf = bgMusicSounds[phase];
-  if(!buf) return;
+  if(!buf){
+    // wait for music to load, retry in 100ms
+    setTimeout(startMusic, 100);
+    return;
+  }
   currentBgMusic = audioCtx.createBufferSource();
   currentBgMusic.buffer = buf;
   currentBgMusic.loop = true;
