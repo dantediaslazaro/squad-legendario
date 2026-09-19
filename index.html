@@ -127,6 +127,7 @@ let gameoverSound = null;
 let congratsSound = null;
 let specialSound = null;
 let bgImages = [];
+let introBg = null;
 
 function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -200,6 +201,8 @@ function loadBgImages(){
     img.src = `images/bg${i+1}.jpg`;
     bgImages[i] = img;
   });
+  introBg = new Image();
+  introBg.src = "images/bg-intro.jpg";
 }
 function tone(freq,duration=0.10,type="square",gain=0.035){
   if(!soundOn) return;
@@ -616,12 +619,12 @@ function draw() {
   ctx.fillText(`PONTOS ${score}`,W-120,30);
 
   if (!player || !boss) {
-    ctx.textAlign="center";
-    ctx.font="bold 44px system-ui";
-    ctx.fillText("🎮 SQUAD LENDÁRIO",W/2,H/2-15);
-    ctx.font="22px system-ui";
-    ctx.fillText("Clique em JOGAR",W/2,H/2+28);
-    ctx.textAlign="left";
+    if(introBg && introBg.complete){
+      ctx.drawImage(introBg, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = `hsl(${hue},40%,9%)`;
+      ctx.fillRect(0,0,W,H);
+    }
     return;
   }
 
