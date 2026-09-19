@@ -109,12 +109,13 @@ let audioCtx = null;
 let musicTimer = null;
 let musicOn = true;
 let soundOn = true;
-let volume = 0.35;
+let volume = 1;
 let controlMode = "both";
 let speedMode = "slow";
 let contactCooldown = 0;
 let laserSound = null;
 let damageSounds = [];
+let bossDamageSound = null;
 let bgMusicSounds = [];
 let currentBgMusic = null;
 let bgMusicLoading = false;
@@ -137,6 +138,13 @@ function initAudio(){
         .then(decoded=>{damageSounds.push(decoded);})
         .catch(()=>{});
     }
+  }
+  if(!bossDamageSound){
+    fetch("sounds/boss-damage.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{bossDamageSound=decoded;})
+      .catch(()=>{});
   }
   if(bgMusicSounds.length === 0 && !bgMusicLoading){
     bgMusicLoading = true;
@@ -206,6 +214,18 @@ function playDamageSound(){
   src.buffer = buf;
   const gain = audioCtx.createGain();
   gain.gain.value = volume * 0.5;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playBossDamageSound(){
+  if(!soundOn || !bossDamageSound) return;
+  initAudio();
+  const src = audioCtx.createBufferSource();
+  src.buffer = bossDamageSound;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.6;
   src.connect(gain);
   gain.connect(audioCtx.destination);
   src.start();
@@ -423,6 +443,7 @@ function update(dt) {
       boss.hp -= s.damage;
       score += 2;
       burst(s.x,s.y,"✨");
+      playBossDamageSound();
     }
   }
   shots = shots.filter(s=>!s.dead && s.x>-40 && s.x<W+40 && s.y>-40 && s.y<H+40);
