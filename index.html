@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Squad Lendário — O Bug Supremo 2020</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#080613;color:#fff;font-family:system-ui,Segoe UI,Arial,sans-serif;display:flex;justify-content:center;min-height:100vh}
+  #wrap{width:min(1000px,100%);padding:14px}
+  h1{text-align:center;margin:4px 0 2px;font-size:clamp(25px,5vw,44px)}
+  .sub{text-align:center;color:#cfc7ff;margin:0 0 10px}
+  #game{width:100%;aspect-ratio:16/9;background:#111;border:3px solid #7d48ff;border-radius:16px;display:block;box-shadow:0 0 35px #3b1c78}
+  #panel{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+  button{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer;color:#fff;background:#5d2cff;box-shadow:0 4px 0 #321580}
+  button:hover{filter:brightness(1.15)}
+  button:active{transform:translateY(2px);box-shadow:0 2px 0 #321580}
+  .green{background:#1b9b61;box-shadow:0 4px 0 #0c5b39}
+  .red{background:#c7374b;box-shadow:0 4px 0 #751b29}
+  #info{background:#151025;border:1px solid #33265c;border-radius:12px;padding:10px;text-align:center}
+  .hide{display:none!important}
+  #touch{display:grid;grid-template-columns:repeat(3,60px);gap:6px;justify-content:center;margin-top:10px}
+  #touch button{padding:10px;font-size:20px}
+  #touch .wide{grid-column:span 3}
+  .small{font-size:13px;color:#bdb6d9}
+  .power{background:#21183a;border:1px solid #493878;border-radius:9px;padding:6px 8px;font-size:12px;cursor:pointer}
+  .power.sel{outline:2px solid #a678ff;background:#35205d}
+  #settingsPanel input,#settingsPanel select{margin-left:7px}
+  #settingsPanel label{display:flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>🎮 SQUAD LENDÁRIO</h1>
+  <p class="sub">O BUG SUPREMO 2020 — 10 fases • 10 chefões</p>
+  <div id="roster" style="background:#151025;border:1px solid #33265c;border-radius:12px;padding:9px;margin-bottom:10px">
+  <b>⚡ PODERES DO SQUAD</b>
+  <div id="powers" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:7px"></div>
+</div>
+<canvas id="game" width="960" height="540"></canvas>
+  <div id="panel">
+    <button id="play">▶️ JOGAR</button>
+    <button id="restart" class="red">↻ RECOMEÇAR</button>
+    <button id="pause" class="green">⏸ PAUSAR</button>
+  </div>
+  <div id="info">
+    <b id="status">Clique em JOGAR para começar.</b><br>
+    <span class="small">Mover: WASD/Setas • Atacar: ESPAÇO • Poder próprio: E • Trocar personagem: 1–9, 0 ou - • Pausar: P • 🐢🎮 Modo SUPER tranquilo</span>
+  </div>
+  <div id="touch">
+    <button data-k="ArrowUp">⬆️</button>
+    <button data-k="Space">⚔️</button>
+    <button data-k="KeyE">✨</button>
+    <button data-k="ArrowLeft">⬅️</button>
+    <button data-k="ArrowDown">⬇️</button>
+    <button data-k="ArrowRight">➡️</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+
+const phases = [
+  ["Floresta do Glitch","🐛 Bug-Lag"],
+  ["Deserto Pixelado","🦂 Escorpião.exe"],
+  ["Castelo Corrompido","👻 Fantasma.dll"],
+  ["Caverna dos Erros","🦇 Morcego 404"],
+  ["Vulcão do Código","🌋 Lava.exe"],
+  ["Cidade Neon","🤖 Robô Glitch"],
+  ["Dimensão Congelada","❄️ Freeze.exe"],
+  ["Laboratório Sus","🧪 Dr. Glitch"],
+  ["Núcleo do Multiverso","🌀 Kernel Quebrado"],
+  ["Fortaleza 2020","👑 BUG SUPREMO 2020"]
+];
+
+const squad = [
+  {name:"DDL", emoji:"🧒🏽", key:"1", skill:"Código Supremo", desc:"Mega rajada de código", color:"#7c5cff"},
+  {name:"Juju", emoji:"🦫", key:"2", skill:"Investida Capivara", desc:"Avanço rápido + dano em área", color:"#4fb3ff"},
+  {name:"Midas", emoji:"🐷", key:"3", skill:"Toque de Ouro", desc:"Converte projéteis e causa dano", color:"#ffd54a"},
+  {name:"ALT", emoji:"🐦‍🔥", key:"4", skill:"Fênix de Fogo", desc:"Rajada de fogo tripla", color:"#ff7043"},
+  {name:"Auro", emoji:"🐸", key:"5", skill:"Salto Relâmpago", desc:"Dispara muitos raios", color:"#64d86b"},
+  {name:"Banguela", emoji:"🐊", key:"6", skill:"Mordida Banguela", desc:"Disparo gigante", color:"#9ccc65"},
+  {name:"Cascuda", emoji:"🐢", key:"7", skill:"Casco Escudo", desc:"Invulnerabilidade por alguns segundos", color:"#50c878"},
+  {name:"Ovelha", emoji:"🐑", key:"8", skill:"Nuvem de Cura", desc:"Recupera bastante vida", color:"#f2b6ff"},
+  {name:"Pipo", emoji:"🐣", key:"9", skill:"Super Velocidade", desc:"Velocidade + tiros rápidos", color:"#ffeb3b"},
+  {name:"Sans", emoji:"💀", key:"0", skill:"Rajada de Ossos", desc:"Tempestade de ossos", color:"#b3e5fc"},
+  {name:"Papyrus", emoji:"💀", key:"-", skill:"Prisão de Ossos", desc:"Enfileira ossos enormes", color:"#ff8a80"}
+];
+
+let keys = {};
+let running = false;
+let paused = false;
+let transitioning = false;
+let phase = 0;
+let score = 0;
+let selected = 0;
+let player, boss;
+let shots = [], enemyShots = [], particles = [];
+let skillCooldown = 0;
+let invuln = 0;
+let speedBoost = 0;
+let bossFrozen = 0;
+let lastTime = 0;
+let deathAnimation = null;
+let victoryAnimation = null;
+let audioCtx = null;
+let musicTimer = null;
+let musicOn = true;
+let soundOn = true;
+let volume = 0.35;
+let controlMode = "both";
+let speedMode = "slow";
+let contactCooldown = 0;
+let laserSound = null;
+let damageSounds = [];
+let bgMusicSounds = [];
+let currentBgMusic = null;
+
+function initAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === "suspended") audioCtx.resume();
+  if(!laserSound){
+    fetch("sounds/laser.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{laserSound=decoded;})
+      .catch(()=>{});
+  }
+  if(damageSounds.length === 0){
+    for(let i=1;i<=4;i++){
+      fetch(`sounds/char-damage-${i}.wav`)
+        .then(r=>r.arrayBuffer())
+        .then(buf=>audioCtx.decodeAudioData(buf))
+        .then(decoded=>{damageSounds.push(decoded);})
+        .catch(()=>{});
+    }
+  }
+  if(bgMusicSounds.length === 0){
+    for(let i=1;i<=10;i++){
+      fetch(`sounds/bg/p${i}.wav`)
+        .then(r=>r.arrayBuffer())
+        .then(buf=>audioCtx.decodeAudioData(buf))
+        .then(decoded=>{bgMusicSounds[i-1]=decoded;})
+        .catch(()=>{});
+    }
+  }
+}
+function tone(freq,duration=0.10,type="square",gain=0.035){
+  if(!soundOn) return;
+  initAudio();
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(Math.max(0.001,gain*volume),audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+duration);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+duration);
+}
+function startMusic(){
+  if(!musicOn) return;
+  initAudio();
+  stopMusic();
+  const buf = bgMusicSounds[phase];
+  if(!buf) return;
+  currentBgMusic = audioCtx.createBufferSource();
+  currentBgMusic.buffer = buf;
+  currentBgMusic.loop = true;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.3;
+  currentBgMusic.connect(gain);
+  gain.connect(audioCtx.destination);
+  currentBgMusic.start();
+}
+function stopMusic(){
+  if(currentBgMusic){
+    currentBgMusic.stop();
+    currentBgMusic = null;
+  }
+}
+function playDeathSound(){ tone(180,.18,"sawtooth",.06); setTimeout(()=>tone(110,.30,"sawtooth",.05),130); }
+function playVictorySound(){ [523,659,784,1047].forEach((n,i)=>setTimeout(()=>tone(n,.25,"triangle",.06),i*150)); }
+
+function playLaserSound(){
+  if(!soundOn || !laserSound) return;
+  initAudio();
+  const src = audioCtx.createBufferSource();
+  src.buffer = laserSound;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.4;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playDamageSound(){
+  if(!soundOn || damageSounds.length === 0) return;
+  initAudio();
+  const buf = damageSounds[Math.floor(Math.random() * damageSounds.length)];
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  gain.gain.value = volume * 0.5;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function resetPlayer() {
+  player = {x:120, y:H/2, r:22, hp:100, maxHp:100, speed:1.65, special:100};
+  shots = [];
+  enemyShots = [];
+  particles = [];
+  skillCooldown = 0;
+  invuln = 0;
+  contactCooldown = 0;
+  speedBoost = 0;
+  bossFrozen = 0;
+}
+
+function loadPhase() {
+  transitioning = false;
+  resetPlayer();
+  const hp = 220 + phase * 50;
+  boss = {
+    x: W - 150, y: H/2, r: 55,
+    hp, maxHp: hp, fireTimer: 60, t: 0, name: phases[phase][1]
+  };
+  updateStatus();
+  if (running && musicOn) startMusic();
+}
+
+function updateStatus() {
+  const p = squad[selected];
+  document.getElementById("status").textContent =
+    `FASE ${phase+1}/10 — ${phases[phase][0]} | CHEFÃO: ${boss ? boss.name : "—"} | PODER: ${p.name} — ${p.skill}`;
+}
+
+function startGame() {
+  initAudio();
+  deathAnimation = null;
+  victoryAnimation = null;
+  running = true;
+  paused = false;
+  transitioning = false;
+  phase = 0;
+  score = 0;
+  selected = 0;
+  document.querySelectorAll(".power").forEach((b,i)=>b.classList.toggle("sel", i===0));
+  loadPhase();
+  startMusic();
+}
+
+function togglePause() {
+  if (!running) return;
+  paused = !paused;
+  updateStatus();
+  if (paused) {
+    document.getElementById("status").textContent += " | ⏸ PAUSADO";
+    stopMusic();
+  } else if (musicOn) {
+    startMusic();
+  }
+}
+
+function fire() {
+  if (!running || paused || skillCooldown > 0) return;
+  skillCooldown = 10;
+  const p = squad[selected];
+  let damage = 12;
+  if (selected === 5) damage = 24;
+  if (selected === 9) damage = 14;
+  if (selected === 10) damage = 16;
+  shots.push({x:player.x+24,y:player.y,vx:4.2,vy:0,r:6,damage});
+  playLaserSound();
+}
+
+function useSkill() {
+  if (!running || paused || player.special < 100 || skillCooldown > 0) return;
+  player.special = 0;
+  skillCooldown = 40;
+
+  if (selected === 0) {
+    for(let a=-0.7;a<=0.7;a+=0.14)
+      shots.push({x:player.x+20,y:player.y,vx:4*Math.cos(a),vy:4*Math.sin(a),r:6,damage:18});
+  } else if (selected === 1) {
+    player.x = Math.min(W-180, player.x+130);
+    burst(player.x,player.y,"💨");
+    for(let a=-0.5;a<=0.5;a+=0.25)
+      shots.push({x:player.x+20,y:player.y,vx:8,vy:a*5,r:9,damage:20});
+  } else if (selected === 2) {
+    enemyShots.forEach(s=>{s.vx*=-1; s.vy*=-1; s.gold=true});
+    shots.push({x:player.x+20,y:player.y,vx:4.8,vy:0,r:12,damage:38});
+    burst(player.x,player.y,"🪙");
+  } else if (selected === 3) {
+    for(let v=-1;v<=1;v++)
+      shots.push({x:player.x+20,y:player.y,vx:4.0,vy:v*0.45,r:10,damage:24});
+    burst(player.x,player.y,"🔥");
+  } else if (selected === 4) {
+    for(let i=0;i<12;i++)
+      shots.push({x:player.x+20,y:player.y,vx:9,vy:(i-5.5)*0.5,r:5,damage:13});
+  } else if (selected === 5) {
+    shots.push({x:player.x+20,y:player.y,vx:5.5,vy:0,r:17,damage:80});
+  } else if (selected === 6) {
+    invuln = 240;
+    burst(player.x,player.y,"🛡️");
+  } else if (selected === 7) {
+    player.hp = Math.min(player.maxHp, player.hp + 55);
+    burst(player.x,player.y,"💚");
+  } else if (selected === 8) {
+    speedBoost = 300;
+    for(let i=0;i<8;i++)
+      shots.push({x:player.x+20,y:player.y,vx:4.8,vy:(i-3.5)*0.18,r:4,damage:12});
+  } else if (selected === 9) {
+    for(let i=0;i<14;i++)
+      shots.push({x:player.x+20,y:player.y,vx:4.2,vy:(i-6.5)*0.22,r:5,damage:15});
+  } else if (selected === 10) {
+    for(let i=0;i<5;i++)
+      shots.push({x:player.x+20,y:player.y,vx:4.0,vy:(i-2)*0.55,r:9,damage:29});
+    bossFrozen = 90;
+  }
+  burst(player.x,player.y,squad[selected].emoji);
+}
+
+function hurt(damage) {
+  if (invuln > 0) return;
+  player.hp -= damage;
+  invuln = 45;
+  burst(player.x,player.y,"💥");
+  playDamageSound();
+  if (player.hp <= 0) {
+    running = false;
+    stopMusic();
+    playDeathSound();
+    deathAnimation = {t:0};
+    document.getElementById("status").textContent =
+      `💀 DERROTA NA FASE ${phase+1}. Aperte JOGAR para tentar novamente.`;
+  }
+}
+
+function defeatBoss() {
+  if (transitioning) return;
+  transitioning = true;
+  boss.hp = 0;
+  score += 100 + phase * 50;
+  burst(boss.x,boss.y,"💥");
+  if (phase === phases.length-1) {
+    running = false;
+    stopMusic();
+    playVictorySound();
+    victoryAnimation = {t:0};
+    document.getElementById("status").textContent =
+      `🏆 VOCÊS VENCERAM AS 10 FASES! BUG SUPREMO DERROTADO! PONTOS: ${score}`;
+    return;
+  }
+  phase++;
+  // A próxima fase é carregada imediatamente, sem resetar phase para 0.
+  setTimeout(() => {
+    if (!running) return;
+    loadPhase();
+  }, 1000);
+}
+
+function burst(x,y,text) {
+  for(let i=0;i<10;i++) {
+    const a=Math.random()*Math.PI*2, s=1+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:38,text});
+  }
+}
+
+function update(dt) {
+  if (!running || paused || transitioning) return;
+
+  const useArrows = controlMode !== "wasd";
+  const useWasd = controlMode !== "arrows";
+  const left = (useArrows && keys.ArrowLeft) || (useWasd && keys.KeyA);
+  const right = (useArrows && keys.ArrowRight) || (useWasd && keys.KeyD);
+  const up = (useArrows && keys.ArrowUp) || (useWasd && keys.KeyW);
+  const down = (useArrows && keys.ArrowDown) || (useWasd && keys.KeyS);
+  const dx = (right?1:0)-(left?1:0);
+  const dy = (down?1:0)-(up?1:0);
+  const len = Math.hypot(dx,dy) || 1;
+  const speed = player.speed + (speedBoost>0 ? 3 : 0);
+
+  player.x = Math.max(28,Math.min(W-28,player.x+dx/len*speed));
+  player.y = Math.max(75,Math.min(H-35,player.y+dy/len*speed));
+
+  if (keys.Space) fire();
+  if (keys.KeyE) useSkill();
+
+  skillCooldown = Math.max(0,skillCooldown-1);
+  invuln = Math.max(0,invuln-1);
+  speedBoost = Math.max(0,speedBoost-1);
+  bossFrozen = Math.max(0,bossFrozen-1);
+  player.special = Math.min(100,player.special + 0.18);
+
+  boss.t += dt * 0.00065;
+  if (bossFrozen <= 0) boss.y = H/2 + Math.sin(boss.t*2.0) * 170;
+
+  boss.fireTimer--;
+  if (boss.fireTimer <= 0 && bossFrozen <= 0) {
+    boss.fireTimer = Math.max(20, 60 - phase * 5);
+    const a = Math.atan2(player.y-boss.y, player.x-boss.x);
+    const sp = 3.1 + phase*0.18;
+    enemyShots.push({x:boss.x-45,y:boss.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:9,damage:7+phase});
+    if (phase >= 3) {
+      enemyShots.push({x:boss.x-45,y:boss.y,vx:Math.cos(a+0.18)*sp,vy:Math.sin(a+0.18)*sp,r:7,damage:5+phase});
+      enemyShots.push({x:boss.x-45,y:boss.y,vx:Math.cos(a-0.18)*sp,vy:Math.sin(a-0.18)*sp,r:7,damage:5+phase});
+    }
+  }
+
+  shots.forEach(s=>{s.x+=s.vx;s.y+=s.vy});
+  enemyShots.forEach(s=>{s.x+=s.vx;s.y+=s.vy});
+
+  for (const s of shots) {
+    if (Math.hypot(s.x-boss.x,s.y-boss.y) < boss.r+s.r) {
+      s.dead = true;
+      boss.hp -= s.damage;
+      score += 2;
+      burst(s.x,s.y,"✨");
+    }
+  }
+  shots = shots.filter(s=>!s.dead && s.x>-40 && s.x<W+40 && s.y>-40 && s.y<H+40);
+
+  for (const s of enemyShots) {
+    if (Math.hypot(s.x-player.x,s.y-player.y) < player.r+s.r) {
+      s.dead = true;
+      hurt(s.damage);
+    }
+  }
+  enemyShots = enemyShots.filter(s=>!s.dead && s.x>-50 && s.x<W+50 && s.y>-50 && s.y<H+50);
+
+  if (boss.hp <= 0) defeatBoss();
+
+  // Encostar no chefão também causa dano.
+  if (!transitioning && contactCooldown <= 0 &&
+      Math.hypot(player.x-boss.x, player.y-boss.y) < player.r+boss.r) {
+    hurt(15 + phase*2);
+    contactCooldown = 55;
+    player.x = Math.max(30, player.x - 35);
+    burst(player.x,player.y,"💥");
+  }
+  contactCooldown = Math.max(0, contactCooldown-1);
+
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--});
+  particles = particles.filter(p=>p.life>0);
+}
+
+function drawBar(x,y,w,h,value,max,fill) {
+  ctx.fillStyle = "#21182f";
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,h/2); ctx.fill();
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.roundRect(x,y,w*Math.max(0,value/max),h,h/2); ctx.fill();
+}
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  const hue = (phase*32)%360;
+  ctx.fillStyle = `hsl(${hue},40%,9%)`;
+  ctx.fillRect(0,0,W,H);
+
+  for(let i=0;i<60;i++){
+    ctx.fillStyle="rgba(255,255,255,.09)";
+    ctx.fillRect((i*149+phase*61)%W,(i*79)%H,2,2);
+  }
+
+  ctx.fillStyle="rgba(110,70,255,.14)";
+  ctx.fillRect(0,0,W,64);
+
+  ctx.fillStyle="#fff";
+  ctx.font="bold 20px system-ui";
+  ctx.fillText(`FASE ${phase+1}/10 — ${phases[phase][0]}`,18,30);
+  ctx.font="15px system-ui";
+  ctx.fillText(`PONTOS ${score}`,W-120,30);
+
+  if (!player || !boss) {
+    ctx.textAlign="center";
+    ctx.font="bold 44px system-ui";
+    ctx.fillText("🎮 SQUAD LENDÁRIO",W/2,H/2-15);
+    ctx.font="22px system-ui";
+    ctx.fillText("Clique em JOGAR",W/2,H/2+28);
+    ctx.textAlign="left";
+    return;
+  }
+
+  drawBar(270,73,420,18,boss.hp,boss.max,"#ef476f");
+  ctx.fillStyle="#fff";
+  ctx.font="bold 15px system-ui";
+  ctx.fillText(boss.name,270,66);
+
+  ctx.save();
+  ctx.globalAlpha = invuln%2 ? .45 : 1;
+  ctx.font="38px system-ui";
+  ctx.fillText("🧒🏽",player.x-19,player.y+14);
+  ctx.restore();
+
+  ctx.font="58px system-ui";
+  ctx.fillText(phase===9 ? "👹" : "👾",boss.x-30,boss.y+21);
+
+  ctx.font="26px system-ui";
+  ctx.fillText(squad[selected].emoji,player.x-12,player.y-28);
+
+  shots.forEach(s=>{
+    ctx.fillStyle="#ffe082";
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+  });
+  enemyShots.forEach(s=>{
+    ctx.fillStyle=s.gold?"#ffd54a":"#ff5474";
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+  });
+
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/38;
+    ctx.font="18px system-ui";
+    ctx.fillText(p.text,p.x,p.y);
+    ctx.globalAlpha=1;
+  });
+
+  drawBar(20,H-34,230,15,player.hp,player.maxHp,"#4ade80");
+  drawBar(270,H-34,230,15,player.special,100,squad[selected].color);
+  ctx.fillStyle="#fff";
+  ctx.font="13px system-ui";
+  ctx.fillText(`❤️ ${Math.ceil(player.hp)}/100`,24,H-39);
+  ctx.fillText(`✨ ${Math.floor(player.special)}% — E`,274,H-39);
+
+  if (paused) {
+    ctx.fillStyle="rgba(0,0,0,.58)";
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign="center";
+    ctx.font="bold 48px system-ui";
+    ctx.fillText("⏸ PAUSADO",W/2,H/2);
+    ctx.textAlign="left";
+  }
+
+  if (deathAnimation) {
+    const p=Math.min(1,deathAnimation.t/1200);
+    ctx.fillStyle=`rgba(0,0,0,${0.18+p*0.65})`;
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign="center";
+    ctx.font="bold 54px system-ui";
+    ctx.fillText("💥",W/2,H/2-45-p*25);
+    ctx.font="bold 38px system-ui";
+    ctx.fillText("💀 VOCÊ FOI DERROTADO!",W/2,H/2+35);
+    ctx.font="20px system-ui";
+    ctx.fillText(`Fase ${phase+1}/10`,W/2,H/2+72);
+    ctx.textAlign="left";
+  }
+
+  if (victoryAnimation) {
+    const p=Math.min(1,victoryAnimation.t/1800);
+    ctx.fillStyle=`rgba(20,5,35,${0.15+p*0.55})`;
+    ctx.fillRect(0,0,W,H);
+    for(let i=0;i<45;i++){
+      const a=i*0.77;
+      const rr=40+p*300+(i%7)*18;
+      ctx.fillStyle=squad[i%squad.length].color;
+      ctx.font="20px system-ui";
+      ctx.fillText("★",W/2+Math.cos(a)*rr,H/2+Math.sin(a)*rr);
+    }
+    ctx.textAlign="center";
+    ctx.font="bold 58px system-ui";
+    ctx.fillText("🏆 VITÓRIA!",W/2,H/2-25);
+    ctx.font="bold 30px system-ui";
+    ctx.fillText("BUG SUPREMO DERROTADO!",W/2,H/2+28);
+    ctx.font="20px system-ui";
+    ctx.fillText("🎉 SQUAD LENDÁRIO COMPLETO! 🎉",W/2,H/2+68);
+    ctx.textAlign="left";
+  }
+}
+
+function loop(t) {
+  const dt = t-lastTime || 16;
+  lastTime = t;
+  update(dt);
+  if(deathAnimation) deathAnimation.t += dt;
+  if(victoryAnimation) victoryAnimation.t += dt;
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown", e => {
+  keys[e.code]=true;
+  if (["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
+  if (e.code==="KeyP") togglePause();
+
+  const map = {Digit1:0,Digit2:1,Digit3:2,Digit4:3,Digit5:4,Digit6:5,Digit7:6,Digit8:7,Digit9:8,Digit0:9,Minus:10};
+  if (map[e.code] !== undefined && running) {
+    selected=map[e.code];
+    document.querySelectorAll(".power").forEach((b,i)=>b.classList.toggle("sel",i===selected));
+    updateStatus();
+  }
+});
+document.addEventListener("keyup", e => keys[e.code]=false);
+
+document.getElementById("play").onclick = startGame;
+document.getElementById("restart").onclick = startGame;
+document.getElementById("pause").onclick = togglePause;
+
+const powersEl = document.getElementById("powers");
+powersEl.innerHTML="";
+squad.forEach((p,i)=>{
+  const b=document.createElement("button");
+  b.className="power"+(i===0?" sel":"");
+  b.textContent=`${p.key}️⃣ ${p.emoji} ${p.name}`;
+  b.title=`${p.skill}: ${p.desc}`;
+  b.onclick=()=>{
+    selected=i;
+    document.querySelectorAll(".power").forEach((x,j)=>x.classList.toggle("sel",j===selected));
+    if (running) updateStatus();
+  };
+  powersEl.appendChild(b);
+});
+
+document.querySelectorAll("#touch button").forEach(b=>{
+  const k=b.dataset.k;
+  const down=e=>{e.preventDefault();keys[k]=true};
+  const up=e=>{e.preventDefault();keys[k]=false};
+  b.addEventListener("pointerdown",down);
+  b.addEventListener("pointerup",up);
+  b.addEventListener("pointerleave",up);
+});
+
+/*
+document.getElementById("settings").onclick=()=>{
+  document.getElementById("settingsPanel").classList.toggle("hide");
+};
+document.getElementById("soundToggle").onchange=e=>soundOn=e.target.checked;
+document.getElementById("musicToggle").onchange=e=>{
+  musicOn=e.target.checked;
+  if(musicOn && running) startMusic(); else stopMusic();
+};
+document.getElementById("volume").oninput=e=>volume=Number(e.target.value)/100;
+document.getElementById("controlMode").onchange=e=>controlMode=e.target.value;
+document.getElementById("speedMode").onchange=e=>{
+  speedMode=e.target.value;
+  if(running) updateStatus();
+};
+*/
+draw();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
