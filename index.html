@@ -28,6 +28,15 @@
   .power.sel{outline:2px solid #a678ff;background:#35205d}
   #settingsPanel input,#settingsPanel select{margin-left:7px}
   #settingsPanel label{display:flex;align-items:center;gap:4px}
+  #shopPanel{background:#151025;border:1px solid #33265c;border-radius:12px;padding:10px;margin:10px 0}
+  #shopPanel button{margin:4px;padding:8px 12px;font-size:13px}
+  #shopPanel button.bought{background:#2e2452;border-color:#6a4cff}
+  #storyOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(8,6,19,.96);border:3px solid #7d48ff;border-radius:14px;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  #storyText{text-align:center;margin-bottom:24px}
+  #storyText .line{display:block;margin:10px auto;font-size:22px;color:#e9e3ff;opacity:0;transition:opacity .5s}
+  #storyText .line.on{opacity:1}
+  #skipStory{padding:10px 22px;font-weight:800;border:0;border-radius:10px;background:#5d2cff;color:#fff;cursor:pointer}
+  #skipStory:hover{filter:brightness(1.15)}
 </style>
 </head>
 <body>
@@ -44,18 +53,30 @@
     <button id="restart" class="red">↻ RECOMEÇAR</button>
     <button id="pause" class="green">⏸ PAUSAR</button>
     <button id="mute">🔊 MÚSICA</button>
+    <button id="shopBtn">🛍 LOJA (R$ <span id="money">0</span>)</button>
+  </div>
+  <div id="shopPanel" class="hide">
+    <b>🛍 LOJA</b>
+    <div class="small" style="margin:6px 0">Seu dinheiro: R$ <span id="shopMoney">0</span></div>
+    <div><button id="buyJetpack" data-upg="jetpack" class="power">⚡ JetPack — R$ 1000 (+VEL • -BOSS • -TAXA)</button></div>
+    <div><button id="buyTriple" data-upg="triple" class="power">🔱 Tiro Triplo — R$ 3000 (3 PROJ.)</button></div>
+    <div><button id="buyFast" data-upg="fastshot" class="power">🔫 Tiro Rápido — R$ 500 (20s)</button></div>
+    <div class="small">* Dinheiro é cumulativo entre partidas. JetPack/Tiro Triplo valem por partida. Tiro Rápido dura 20s.</div>
   </div>
   <div id="info">
     <b id="status">Clique em JOGAR para começar.</b><br>
-    <span class="small">Mover: WASD/Setas • Atacar: ESPAÇO • Poder próprio: E • Trocar personagem: 1–9, 0 ou - • Pausar: P • 🐢🎮 Modo SUPER tranquilo</span>
+    <span class="small">Mover: WASD/Setas • Atacar: automático • Poder próprio: ESPAÇO • Trocar personagem: 1–9, 0 ou - • Pausar: P • 🐢🎮 Modo SUPER tranquilo</span>
   </div>
   <div id="touch">
     <button data-k="ArrowUp">⬆️</button>
-    <button data-k="Space">⚔️</button>
-    <button data-k="KeyE">✨</button>
+    <button data-k="Space">✨</button>
     <button data-k="ArrowLeft">⬅️</button>
     <button data-k="ArrowDown">⬇️</button>
     <button data-k="ArrowRight">➡️</button>
+  </div>
+  <div id="storyOverlay" class="hide">
+    <div id="storyText"></div>
+    <button id="skipStory">⏭️ PULAR</button>
   </div>
 </div>
 
@@ -79,7 +100,7 @@ const phases = [
 
 const squad = [
   {name:"DDL", emoji:"🧒🏽", key:"1", skill:"Código Supremo", desc:"Mega rajada de código", color:"#7c5cff"},
-  {name:"Juju", emoji:"🦫", key:"2", skill:"Investida Capivara", desc:"Avanço rápido + dano em área", color:"#4fb3ff"},
+  {name:"Juju", emoji:"🦫", key:"2", skill:"Investida Capivara", shot:"Biscoito Capy", desc:"Avanço rápido + dano em área", color:"#4fb3ff"},
   {name:"Midas", emoji:"🐷", key:"3", skill:"Toque de Ouro", desc:"Converte projéteis e causa dano", color:"#ffd54a"},
   {name:"ALT", emoji:"🐦‍🔥", key:"4", skill:"Fênix de Fogo", desc:"Rajada de fogo tripla", color:"#ff7043"},
   {name:"Auro", emoji:"🐸", key:"5", skill:"Salto Relâmpago", desc:"Dispara muitos raios", color:"#64d86b"},
@@ -89,6 +110,15 @@ const squad = [
   {name:"Pipo", emoji:"🐣", key:"9", skill:"Super Velocidade", desc:"Velocidade + tiros rápidos", color:"#ffeb3b"},
   {name:"Sans", emoji:"💀", key:"0", skill:"Rajada de Ossos", desc:"Tempestade de ossos", color:"#b3e5fc"},
   {name:"Papyrus", emoji:"💀", key:"-", skill:"Prisão de Ossos", desc:"Enfileira ossos enormes", color:"#ff8a80"}
+];
+
+const POWERUP_TYPES =[
+  {type:"speed",     icon:"⚡", color:"#ffd54a"},
+  {type:"slow",      icon:"❄️", color:"#7ad0ff"},
+  {type:"shield",    icon:"🛡️", color:"#64d86b"},
+  {type:"slowfire",  icon:"🤢", color:"#ff6b8b"},
+  {type:"bomb",      icon:"💣", color:"#ff4500"},
+  {type:"heal",      icon:"❤️", color:"#ff5252"}
 ];
 
 let keys = {};
@@ -104,6 +134,17 @@ let skillCooldown = 0;
 let invuln = 0;
 let speedBoost = 0;
 let bossFrozen = 0;
+let powerups = [];
+let playerSpeedMult = 1;
+let bossSpeedMult = 1;
+let bossSlowFire = 0;
+let playerFireSlow = 0;
+let fastShotTimer = 0;
+let speedBoostTime = 0;
+let bossSlowTime = 0;
+let money = 0;
+let upgJetpack = false;
+let upgTriple = false;
 let lastTime = 0;
 let deathAnimation = null;
 let victoryAnimation = null;
@@ -126,8 +167,58 @@ let currentOpeningMusic = null;
 let gameoverSound = null;
 let congratsSound = null;
 let specialSound = null;
+let popSound = null;
+let activeOneShots = [];
 let bgImages = [];
 let introBg = null;
+
+function earn(n){ score += n; money += n; saveMoney(); }
+function saveMoney(){ if(window.localStorage){ localStorage.setItem("squad_money", money); updateMoneyDisplay(); } }
+function loadShop(){
+  money = Number(localStorage.getItem("squad_money")||0);
+  updateMoneyDisplay();
+}
+function updateMoneyDisplay(){
+  const m=document.getElementById("money");
+  if(m) m.textContent=money;
+}
+
+const storyLines = [
+  "Em um universo corrompido pelo próprio código,",
+  "o BUG SUPREMO 2020 se espalha destruindo a realidade.",
+  "Doze heróis improváveis se preparam para a batalha final.",
+  "Cada um carrega um poder único, forjado no caos digital.",
+  "São 10 fases de pura lógica quebrada... e 10 chefões esquisitos.",
+  "Será que o SQUAD LENDÁRIO consegue derrotar o bug supremo?"
+];
+let storyTimer = null;
+function showStory(){
+  if(!audioCtx){ initAudio(); }
+  else if(audioCtx.state === "suspended") audioCtx.resume();
+  document.getElementById("storyOverlay").classList.remove("hide");
+  const box = document.getElementById("storyText");
+  box.innerHTML = "";
+  let i = 0;
+  const reveal = ()=>{
+    if(i < storyLines.length){
+      const el = document.createElement("div");
+      el.className = "line";
+      el.textContent = storyLines[i];
+      box.appendChild(el);
+      setTimeout(()=>el.classList.add("on"), 10);
+      i++;
+      storyTimer = setTimeout(reveal, 1700);
+    } else {
+      storyTimer = setTimeout(endStory, 1400);
+    }
+  };
+  reveal();
+}
+function endStory(){
+  if(storyTimer) clearTimeout(storyTimer);
+  document.getElementById("storyOverlay").classList.add("hide");
+  startGame();
+}
 
 function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -181,6 +272,13 @@ function initAudio(){
       .then(r=>r.arrayBuffer())
       .then(buf=>audioCtx.decodeAudioData(buf))
       .then(decoded=>{specialSound=decoded;})
+      .catch(()=>{});
+  }
+  if(!popSound){
+    fetch("sounds/pop.wav")
+      .then(r=>r.arrayBuffer())
+      .then(buf=>audioCtx.decodeAudioData(buf))
+      .then(decoded=>{popSound=decoded;})
       .catch(()=>{});
   }
   if(bgMusicSounds.length === 0 && !bgMusicLoading){
@@ -278,6 +376,12 @@ function playBossDamageSound(){
   src.start();
 }
 
+function playPowerupSound(){
+  if(!soundOn) return;
+  tone(660,.10,"sine",.04);
+  setTimeout(()=>tone(784,.10,"sine",.04),60);
+}
+
 function playSpecialSound(){
   if(!soundOn || !specialSound) return;
   initAudio();
@@ -300,8 +404,16 @@ function playOneShot(buf, gainMul){
   src.connect(gain);
   gain.connect(audioCtx.destination);
   src.start();
+  activeOneShots.push(src);
+  src.onended = ()=>{ activeOneShots = activeOneShots.filter(s=>s!==src); };
 }
 
+function stopOneShots(){
+  activeOneShots.forEach(s=>{try{s.stop();}catch(e){}});
+  activeOneShots = [];
+}
+
+function playPopSound(){ playOneShot(popSound, 0.7); }
 function playGameoverSound(){ playOneShot(gameoverSound, 0.8); }
 function playCongratsSound(){ playOneShot(congratsSound, 0.9); }
 
@@ -351,6 +463,13 @@ function resetPlayer() {
   contactCooldown = 0;
   speedBoost = 0;
   bossFrozen = 0;
+  powerups = [];
+  playerSpeedMult = 1;
+  bossSpeedMult = 1;
+  bossSlowFire = 0;
+  playerFireSlow = 0;
+  speedBoostTime = 0;
+  bossSlowTime = 0;
 }
 
 function loadPhase() {
@@ -361,8 +480,21 @@ function loadPhase() {
     x: W - 150, y: H/2, r: 55,
     hp, maxHp: hp, fireTimer: 60, t: 0, name: phases[phase][1]
   };
-  updateStatus();
-  if (running && musicOn) startMusic();
+   updateStatus();
+   spawnPowerup();
+   if (running && musicOn) startMusic();
+}
+
+function spawnPowerup(){
+  powerups = [];
+  const pw = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
+  let x = 140 + Math.random()*380;
+  let y = 120 + Math.random()*(H-220);
+  for(let i=0;i<10 && Math.hypot(x-boss.x,y-boss.y)<200;i++){
+    x = 140 + Math.random()*380;
+    y = 120 + Math.random()*(H-220);
+  }
+  powerups.push({x,y,r:18,type:pw.type,icon:pw.icon,color:pw.color});
 }
 
 function updateStatus() {
@@ -375,14 +507,19 @@ function startGame() {
   initAudio();
   deathAnimation = null;
   victoryAnimation = null;
+  stopOneShots();
+  stopMusic();
+  stopOpeningMusic();
   running = true;
   paused = false;
   transitioning = false;
   phase = 0;
   score = 0;
   selected = 0;
+  upgJetpack = false;
+  upgTriple = false;
+  refreshShopUI();
   document.querySelectorAll(".power").forEach((b,i)=>b.classList.toggle("sel", i===0));
-  stopOpeningMusic();
   loadPhase();
   startMusic();
 }
@@ -401,13 +538,19 @@ function togglePause() {
 
 function fire() {
   if (!running || paused || skillCooldown > 0) return;
-  skillCooldown = 10;
+  const cd = fastShotTimer > 0 ? 3 : (playerFireSlow > 0 ? 20 : 10);
+  skillCooldown = cd;
   const p = squad[selected];
-  let damage = 12;
+  let damage = 12, r = 6, cookie = false;
+  if (p.shot) { cookie = true; r = 7; damage = 14; }
   if (selected === 5) damage = 24;
   if (selected === 9) damage = 14;
   if (selected === 10) damage = 16;
-  shots.push({x:player.x+24,y:player.y,vx:4.2,vy:0,r:6,damage});
+  shots.push({x:player.x+24,y:player.y,vx:4.2,vy:0,r,damage,cookie});
+  if(upgTriple){
+    shots.push({x:player.x+24,y:player.y,vx:4.2,vy:-0.6,r,damage,cookie});
+    shots.push({x:player.x+24,y:player.y,vx:4.2,vy:0.6,r,damage,cookie});
+  }
   playLaserSound();
 }
 
@@ -470,6 +613,7 @@ function hurt(damage) {
     stopMusic();
     playDeathSound();
     playGameoverSound();
+    fastShotTimer = 0;
     deathAnimation = {t:0};
     document.getElementById("status").textContent =
       `💀 DERROTA NA FASE ${phase+1}. Aperte JOGAR para tentar novamente.`;
@@ -480,13 +624,14 @@ function defeatBoss() {
   if (transitioning) return;
   transitioning = true;
   boss.hp = 0;
-  score += 100 + phase * 50;
+  earn(10000 + phase * 5000);
   burst(boss.x,boss.y,"💥");
   if (phase === phases.length-1) {
     running = false;
     stopMusic();
     playVictorySound();
     playCongratsSound();
+    fastShotTimer = 0;
     victoryAnimation = {t:0};
     document.getElementById("status").textContent =
       `🏆 VOCÊS VENCERAM AS 10 FASES! BUG SUPREMO DERROTADO! PONTOS: ${score}`;
@@ -519,26 +664,35 @@ function update(dt) {
   const dx = (right?1:0)-(left?1:0);
   const dy = (down?1:0)-(up?1:0);
   const len = Math.hypot(dx,dy) || 1;
-  const speed = player.speed + (speedBoost>0 ? 3 : 0);
+  const speed = (player.speed + (speedBoost>0 ? 3 : 0)) * playerSpeedMult * (upgJetpack?1.6:1);
 
   player.x = Math.max(28,Math.min(W-28,player.x+dx/len*speed));
   player.y = Math.max(75,Math.min(H-35,player.y+dy/len*speed));
 
-  if (keys.Space) fire();
-  if (keys.KeyE) useSkill();
+  if (keys.Space) useSkill();
+  if (skillCooldown === 0) fire();
 
   skillCooldown = Math.max(0,skillCooldown-1);
   invuln = Math.max(0,invuln-1);
   speedBoost = Math.max(0,speedBoost-1);
   bossFrozen = Math.max(0,bossFrozen-1);
+  bossSlowFire = Math.max(0,bossSlowFire-1);
+  playerFireSlow = Math.max(0,playerFireSlow-1);
+  fastShotTimer = Math.max(0,fastShotTimer-1);
+  if (speedBoostTime > 0) { speedBoostTime--; if (speedBoostTime <= 0) playerSpeedMult = 1; }
+  if (bossSlowTime > 0) { bossSlowTime--; if (bossSlowTime <= 0) bossSpeedMult = 1; }
+  const prevSpecial = player.special;
   player.special = Math.min(100,player.special + 0.18);
+  if(prevSpecial < 100 && player.special >= 100) playPopSound();
 
   boss.t += dt * 0.00065;
-  if (bossFrozen <= 0) boss.y = H/2 + Math.sin(boss.t*2.0) * 170;
+  if (bossFrozen <= 0) boss.y = H/2 + Math.sin(boss.t*2.0 * bossSpeedMult * (upgJetpack?0.6:1)) * 170;
 
   boss.fireTimer--;
   if (boss.fireTimer <= 0 && bossFrozen <= 0) {
     boss.fireTimer = Math.max(20, 60 - phase * 5);
+    if (bossSlowFire > 0) boss.fireTimer *= 2;
+    if (upgJetpack) boss.fireTimer = Math.round(boss.fireTimer * 1.7);
     const a = Math.atan2(player.y-boss.y, player.x-boss.x);
     const sp = 3.1 + phase*0.18;
     enemyShots.push({x:boss.x-45,y:boss.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:9,damage:7+phase});
@@ -555,7 +709,7 @@ function update(dt) {
     if (Math.hypot(s.x-boss.x,s.y-boss.y) < boss.r+s.r) {
       s.dead = true;
       boss.hp -= s.damage;
-      score += 2;
+      earn(200);
       burst(s.x,s.y,"✨");
       playBossDamageSound();
     }
@@ -569,6 +723,30 @@ function update(dt) {
     }
   }
   enemyShots = enemyShots.filter(s=>!s.dead && s.x>-50 && s.x<W+50 && s.y>-50 && s.y<H+50);
+
+  // Powerup collection
+  powerups = powerups.filter(p=>{
+    if(Math.hypot(player.x-p.x,player.y-p.y) < player.r+p.r){
+      if(p.type==="shield") invuln = 300;
+      else if(p.type==="speed") { playerSpeedMult = 2; speedBoostTime = 480; }
+      else if(p.type==="slow") { bossSpeedMult = 0.5; bossSlowTime = 480; }
+      else if(p.type==="slowfire") playerFireSlow = 300;
+      else if(p.type==="bomb"){
+        boss.hp -= 60;
+        earn(200);
+        burst(boss.x,boss.y,"💥");
+        playBossDamageSound();
+      }
+      else if(p.type==="heal"){
+        player.hp = Math.min(player.maxHp, player.hp + 40);
+        burst(p.x,p.y,"💖");
+      }
+      burst(p.x,p.y,"✨");
+      playPowerupSound();
+      return false;
+    }
+    return true;
+  });
 
   if (boss.hp <= 0) defeatBoss();
 
@@ -646,8 +824,18 @@ function draw() {
   ctx.fillText(squad[selected].emoji,player.x-12,player.y-28);
 
   shots.forEach(s=>{
-    ctx.fillStyle="#ffe082";
-    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+    if(s.cookie){
+      ctx.fillStyle="#8B4513";
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#ffe082";
+      ctx.font="bold 13px system-ui";
+      ctx.textAlign="center";
+      ctx.fillText("🍪",s.x,s.y+4);
+      ctx.textAlign="left";
+    } else {
+      ctx.fillStyle="#ffe082";
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+    }
   });
   enemyShots.forEach(s=>{
     ctx.fillStyle=s.gold?"#ffd54a":"#ff5474";
@@ -661,12 +849,29 @@ function draw() {
     ctx.globalAlpha=1;
   });
 
+  // Powerups
+  powerups.forEach(p=>{
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#fff";
+    ctx.textAlign="center";
+    ctx.font="26px system-ui";
+    ctx.fillText(p.icon,p.x,p.y+9);
+    ctx.textAlign="left";
+  });
+
   drawBar(20,H-34,230,15,player.hp,player.maxHp,"#4ade80");
   drawBar(270,H-34,230,15,player.special,100,squad[selected].color);
   ctx.fillStyle="#fff";
   ctx.font="13px system-ui";
   ctx.fillText(`❤️ ${Math.ceil(player.hp)}/100`,24,H-39);
-  ctx.fillText(`✨ ${Math.floor(player.special)}% — E`,274,H-39);
+  ctx.fillText(`✨ ${Math.floor(player.special)}% — ESPAÇO`,274,H-39);
+  let px = 490;
+  if (speedBoostTime > 0){ ctx.fillStyle="#ffd54a"; ctx.font="bold 13px system-ui"; ctx.fillText(`⚡ ${Math.ceil(speedBoostTime/60)}s`,px,H-39); px+=90; }
+  if (bossSlowTime > 0){ ctx.fillStyle="#7ad0ff"; ctx.fillText(`❄️ ${Math.ceil(bossSlowTime/60)}s`,px,H-39); px+=90; }
+  if (invuln > 0){ ctx.fillStyle="#64d86b"; ctx.fillText(`🛡️ ${Math.ceil(invuln/60)}s`,px,H-39); px+=90; }
+  if (playerFireSlow > 0){ ctx.fillStyle="#ff6b8b"; ctx.fillText(`🤢 ${Math.ceil(playerFireSlow/60)}s`,px,H-39); px+=90; }
+  if (fastShotTimer > 0){ ctx.fillStyle="#ffe082"; ctx.fillText(`🔫 ${Math.ceil(fastShotTimer/60)}s`,px,H-39); px+=90; }
 
   if (paused) {
     ctx.fillStyle="rgba(0,0,0,.58)";
@@ -738,12 +943,48 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keyup", e => keys[e.code]=false);
 
-document.getElementById("play").onclick = startGame;
+document.getElementById("play").onclick = showStory;
 document.getElementById("restart").onclick = startGame;
 document.getElementById("pause").onclick = togglePause;
 document.getElementById("mute").onclick = toggleMusic;
+document.getElementById("skipStory").onclick = endStory;
 document.getElementById("mute").classList.toggle("muted", !musicOn);
 document.getElementById("mute").textContent = musicOn ? "🔊 MÚSICA" : "🔇 MÚSICA";
+
+document.getElementById("shopBtn").addEventListener("click",()=>{
+  document.getElementById("shopPanel").classList.toggle("hide");
+  refreshShopUI();
+});document.querySelectorAll("#shopPanel button[data-upg]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    buyUpgrade(btn.getAttribute("data-upg"));
+  });
+});
+function buyUpgrade(upg){
+  if(upg==="jetpack"){
+    if(money >= 1000 && !upgJetpack){ money -= 1000; upgJetpack = true; saveMoney(); }
+  } else if(upg==="triple"){
+    if(money >= 3000 && !upgTriple){ money -= 3000; upgTriple = true; saveMoney(); }
+  } else if(upg==="fastshot"){
+    if(money >= 500){ money -= 500; saveMoney(); fastShotTimer = Math.min(fastShotTimer + 1200, 3600); }
+  }
+  refreshShopUI();
+}
+function refreshShopUI(){
+  const jb = document.getElementById("buyJetpack");
+  if(jb){
+    if(upgJetpack){ jb.classList.add("bought"); jb.textContent = "⚡ JetPack — ADQUIRIDO"; jb.disabled = true; }
+    else { jb.classList.remove("bought"); jb.textContent = "⚡ JetPack — R$ 1000 (+VEL • -BOSS • -TAXA)"; jb.disabled = false; }
+  }
+  const tb = document.getElementById("buyTriple");
+  if(tb){
+    if(upgTriple){ tb.classList.add("bought"); tb.textContent = "🔱 Tiro Triplo — ADQUIRIDO"; tb.disabled = true; }
+    else { tb.classList.remove("bought"); tb.textContent = "🔱 Tiro Triplo — R$ 3000 (3 PROJ.)"; tb.disabled = false; }
+  }
+  const fb = document.getElementById("money");
+  if(fb) fb.textContent = money;
+  const sb = document.getElementById("shopMoney");
+  if(sb) sb.textContent = money;
+}
 
 const powersEl = document.getElementById("powers");
 powersEl.innerHTML="";
@@ -751,7 +992,7 @@ squad.forEach((p,i)=>{
   const b=document.createElement("button");
   b.className="power"+(i===0?" sel":"");
   b.textContent=`${p.key}️⃣ ${p.emoji} ${p.name}`;
-  b.title=`${p.skill}: ${p.desc}`;
+  b.title = (p.shot ? `Tiro: ${p.shot} | ` : "") + `${p.skill}: ${p.desc}`;
   b.onclick=()=>{
     selected=i;
     document.querySelectorAll(".power").forEach((x,j)=>x.classList.toggle("sel",j===selected));
@@ -786,6 +1027,8 @@ document.getElementById("speedMode").onchange=e=>{
 };
 */
 draw();
+loadShop();
+refreshShopUI();
 initAudio();
 loadBgImages();
 startOpeningMusic();
