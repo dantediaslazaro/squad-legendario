@@ -1,0 +1,28 @@
+{
+  "name": "Squad Lendário — O Bug Supremo 2020",
+  "short_name": "Squad Lendário",
+  "description": "Jogo de tiro retro: derrote o Bug Supremo 2020 em 10 fases.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#080613",
+  "theme_color": "#7d48ff",
+  "icons": [
+    {
+      "src": "images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "images/icon.png",
+      "sizes": "400x387",
+      "type": "image/png"
+    }
+  ]
+}

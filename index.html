@@ -2,8 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Squad Lendário — O Bug Supremo 2020</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#7d48ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="./images/icon-512.png">
+  <title>Squad Lendário — O Bug Supremo 2020</title>
 <style>
   *{box-sizing:border-box}
   body{margin:0;background:#080613;color:#fff;font-family:system-ui,Segoe UI,Arial,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -1032,7 +1037,12 @@ refreshShopUI();
 initAudio();
 loadBgImages();
 startOpeningMusic();
-requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+  }
 </script>
 </body>
 </html>
